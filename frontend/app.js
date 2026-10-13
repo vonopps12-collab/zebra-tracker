@@ -5,6 +5,19 @@ const API_BASE = (window.location.protocol === "file:" || (window.location.port 
     ? "http://127.0.0.1:5000"
     : "";
 
+// Transparent fetch wrapper for seamless cross-origin and local file session handling
+const _nativeFetch = window.fetch;
+window.fetch = function(url, options = {}) {
+    const opts = { ...options };
+    opts.credentials = "include";
+    opts.headers = { ...(opts.headers || {}) };
+    const uid = localStorage.getItem("zebra_user_id");
+    if (uid) {
+        opts.headers["X-User-Id"] = uid;
+    }
+    return _nativeFetch(url, opts);
+};
+
 // Global Application State
 let currentUser = null;
 let currentCurrency = "TZS";
@@ -108,6 +121,9 @@ function switchPage(pageName) {
 
 function showApp(user) {
     currentUser = user;
+    if (user && user.id) {
+        localStorage.setItem("zebra_user_id", user.id);
+    }
     currentCurrency = user.currency || "TZS";
     updateCurrencyLabels();
 
@@ -126,6 +142,7 @@ function showApp(user) {
 
 function showAuth() {
     currentUser = null;
+    localStorage.removeItem("zebra_user_id");
     document.getElementById("appContainer").classList.add("hidden");
     document.getElementById("authOverlay").classList.remove("hidden");
     switchAuth("login");

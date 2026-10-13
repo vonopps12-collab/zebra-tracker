@@ -40,7 +40,7 @@ def handle_preflight():
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-User-Id"
         return response
 
 @app.after_request
@@ -50,7 +50,7 @@ def add_cors_headers(response):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-User-Id"
     return response
 
 db.init_app(app)
@@ -61,7 +61,16 @@ with app.app_context():
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "user_id" not in session:
+        user_id = session.get("user_id")
+        if not user_id:
+            header_uid = request.headers.get("X-User-Id")
+            if header_uid:
+                try:
+                    user_id = int(header_uid)
+                    session["user_id"] = user_id
+                except (ValueError, TypeError):
+                    pass
+        if not user_id:
             return jsonify({"error": "Unauthorized. Please sign in."}), 401
         return f(*args, **kwargs)
     return decorated_function
@@ -132,6 +141,15 @@ def logout():
 @app.route("/api/me", methods=["GET"])
 def get_current_user():
     user_id = session.get("user_id")
+    if not user_id:
+        header_uid = request.headers.get("X-User-Id")
+        if header_uid:
+            try:
+                user_id = int(header_uid)
+                session["user_id"] = user_id
+            except (ValueError, TypeError):
+                pass
+
     if not user_id:
         return jsonify({"authenticated": False, "user": None}), 200
 
